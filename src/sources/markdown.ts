@@ -139,32 +139,14 @@ export function parseHeading(heading: string): {
  */
 export function processMdxForSearch(content: string): ProcessedMdx {
   const checksum = createHash('sha256').update(content).digest('base64')
-  const {content: rawContent, data: metadata} = matter(content)
-
-  const mdxTree = fromMarkdown(rawContent, {
-    extensions: [mdxjs()],
-    mdastExtensions: [mdxFromMarkdown()]
-  })
-
-  //const meta = extractMetaExport(mdxTree)
+  const {content: rawContent, data: metadata} = matter(
+    content.replace(/^\s+|\s+$/g, '').trim()
+  )
 
   const serializableMeta: Json =
     metadata && JSON.parse(JSON.stringify(metadata))
 
-  // Remove all MDX elements from markdown
-  // const mdTree = filter(
-  //   mdxTree,
-  //   node =>
-  //     ![
-  //       'mdxjsEsm',
-  //       // 'mdxJsxFlowElement',
-  //       // 'mdxJsxTextElement',
-  //       // 'mdxFlowExpression',
-  //       // 'mdxTextExpression'
-  //     ].includes(node.type)
-  // )
-
-  if (!rawContent) {
+  if (!rawContent || !rawContent.trim()) {
     return {
       checksum,
       meta: serializableMeta,
@@ -188,7 +170,7 @@ export function processMdxForSearch(content: string): ProcessedMdx {
   const decodedChunks = chunks.map(decode)
 
   const sections = decodedChunks.map((chunkText, i, chunkArray) => {
-    const text = chunkText.trim()
+    const text = chunkText.replace(/^\s+|\s+$/g, '').trim()
 
     const localTree = fromMarkdown(text, {
       extensions: [mdxjs()],
@@ -213,30 +195,6 @@ export function processMdxForSearch(content: string): ProcessedMdx {
       content: text
     }
   })
-
-  // const sectionTrees = splitTreeBy(mdTree, node => node.type === 'heading')
-
-  // const sections = sectionTrees.map(tree => {
-  //   const [firstNode] = tree.children
-  //   const content = toMarkdown(tree)
-
-  //   const rawHeading: string | undefined =
-  //     firstNode.type === 'heading' ? toString(firstNode) : undefined
-
-  //   if (!rawHeading) {
-  //     return {content}
-  //   }
-
-  //   const {heading, customAnchor} = parseHeading(rawHeading)
-
-  //   const slug = slugger.slug(customAnchor ?? heading)
-
-  //   return {
-  //     content,
-  //     heading,
-  //     slug
-  //   }
-  // })
 
   return {
     checksum,

@@ -1,7 +1,7 @@
 import * as process from 'process'
 import * as cp from 'child_process'
 import * as path from 'path'
-import {expect, test} from 'vitest'
+import {expect, suite, test} from 'vitest'
 import {walk} from '../src/sources/util'
 import {MarkdownSource} from '../src/sources/markdown'
 import {encode} from 'gpt-tokenizer'
@@ -36,32 +36,54 @@ test('it can find markdown sources', async () => {
   expect(embeddingSources.length).toBe(4)
 })
 
-test('it can parse and chunk markdown sources', async () => {
+suite('it can parse and chunk markdown sources', async () => {
   const embeddingSources = (await walk(TESTROOT))
     .filter(({path}) => /\.mdx?$/.test(path))
     .map(entry => new MarkdownSource('markdown', entry.path))
 
-  embeddingSources[0].load().then(({checksum, meta, sections}) => {
-    expect(Object.keys(meta).length).toBe(0)
-    expect(sections.length).toBe(0)
+  const emptyMDX = embeddingSources.find(
+    ({path}) => path === 'tests/test-files/empty'
+  )
+  const emptyMD = embeddingSources.find(
+    ({path}) => path === 'tests/test-files/test-folder/empty'
+  )
+  const longMDX = embeddingSources.find(
+    ({path}) => path === 'tests/test-files/test-folder/long'
+  )
+  const longMD = embeddingSources.find(
+    ({path}) => path === 'tests/test-files/full'
+  )
+
+  test('it can parse an empty mdx file', async () => {
+    emptyMDX.load().then(({checksum, meta, sections}) => {
+      expect(Object.keys(meta).length).toBe(0)
+      expect(sections.length).toBe(0)
+    })
   })
-  embeddingSources[1].load().then(({checksum, meta, sections}) => {
-    expect(Object.keys(meta).length).toBe(1)
-    expect(meta.slug).toBe('fourth-file')
-    expect(sections.length).toBe(1)
+  test('it can parse an empty md file', async () => {
+    longMD.load().then(({checksum, meta, sections}) => {
+      expect(Object.keys(meta).length).toBe(1)
+      expect(meta.slug).toBe('second-file-md')
+      expect(sections.length).toBe(1)
+      expect(sections[0].content.slice(-1)).toBe('`')
+    })
   })
-  embeddingSources[2].load().then(({checksum, meta, sections}) => {
-    expect(Object.keys(meta).length).toBe(0)
-    expect(sections.length).toBe(0)
+  test('it can parse an empty ', async () => {
+    emptyMD.load().then(({checksum, meta, sections}) => {
+      expect(Object.keys(meta).length).toBe(0)
+      expect(sections.length).toBe(0)
+    })
   })
-  embeddingSources[3].load().then(({checksum, meta, sections}) => {
-    expect(meta.title).toBe('Third File')
-    expect(sections.length).toBe(2)
-    const encoded = encode(sections[0].content)
-    expect(encoded.length).toBeGreaterThan(350)
-    expect(encoded.length).toBeLessThanOrEqual(400)
-    expect(sections[0].content.slice(0, 10)).toBe('# Projects')
-    expect(sections[0].heading).toBe('Projects')
-    expect(sections[0].slug).toBe('projects')
+  test('it can parse a long mdx file', async () => {
+    longMDX.load().then(({checksum, meta, sections}) => {
+      expect(meta.title).toBe('long mdx file')
+      expect(sections.length).toBe(2)
+      const encoded = encode(sections[0].content)
+      expect(encoded.length).toBeGreaterThan(350)
+      expect(encoded.length).toBeLessThanOrEqual(400)
+      expect(sections[0].content.slice(0, 10)).toBe('# Projects')
+      expect(sections[0].heading).toBe('Projects')
+      expect(sections[0].slug).toBe('projects')
+    })
   })
 })

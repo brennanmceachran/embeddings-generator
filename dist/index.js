@@ -62096,26 +62096,9 @@ function parseHeading(heading) {
  */
 function processMdxForSearch(content) {
     const checksum = (0,external_crypto_.createHash)('sha256').update(content).digest('base64');
-    const { content: rawContent, data: metadata } = gray_matter_default()(content);
-    const mdxTree = fromMarkdown(rawContent, {
-        extensions: [mdxjs()],
-        mdastExtensions: [mdxFromMarkdown()]
-    });
-    //const meta = extractMetaExport(mdxTree)
+    const { content: rawContent, data: metadata } = gray_matter_default()(content.replace(/^\s+|\s+$/g, '').trim());
     const serializableMeta = metadata && JSON.parse(JSON.stringify(metadata));
-    // Remove all MDX elements from markdown
-    // const mdTree = filter(
-    //   mdxTree,
-    //   node =>
-    //     ![
-    //       'mdxjsEsm',
-    //       // 'mdxJsxFlowElement',
-    //       // 'mdxJsxTextElement',
-    //       // 'mdxFlowExpression',
-    //       // 'mdxTextExpression'
-    //     ].includes(node.type)
-    // )
-    if (!rawContent) {
+    if (!rawContent || !rawContent.trim()) {
         return {
             checksum,
             meta: serializableMeta,
@@ -62134,7 +62117,7 @@ function processMdxForSearch(content) {
     // Now we need to decode these chunks
     const decodedChunks = chunks.map(decode);
     const sections = decodedChunks.map((chunkText, i, chunkArray) => {
-        const text = chunkText.trim();
+        const text = chunkText.replace(/^\s+|\s+$/g, '').trim();
         const localTree = fromMarkdown(text, {
             extensions: [mdxjs()],
             mdastExtensions: [mdxFromMarkdown()]
@@ -62154,23 +62137,6 @@ function processMdxForSearch(content) {
             content: text
         };
     });
-    // const sectionTrees = splitTreeBy(mdTree, node => node.type === 'heading')
-    // const sections = sectionTrees.map(tree => {
-    //   const [firstNode] = tree.children
-    //   const content = toMarkdown(tree)
-    //   const rawHeading: string | undefined =
-    //     firstNode.type === 'heading' ? toString(firstNode) : undefined
-    //   if (!rawHeading) {
-    //     return {content}
-    //   }
-    //   const {heading, customAnchor} = parseHeading(rawHeading)
-    //   const slug = slugger.slug(customAnchor ?? heading)
-    //   return {
-    //     content,
-    //     heading,
-    //     slug
-    //   }
-    // })
     return {
         checksum,
         meta: serializableMeta,

@@ -10,7 +10,7 @@
     "lint": "eslint src/**/*.ts",
     "package": "ncc build --source-map --license licenses.txt",
     "test": "vitest",
-    "all": "npm run format && npm run package"
+    "all": "vitest run && npm run format && npm run package"
   },
   "repository": {
     "type": "git",
