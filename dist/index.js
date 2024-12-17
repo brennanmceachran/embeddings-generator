@@ -21391,14 +21391,17 @@ function useColors() {
 		return false;
 	}
 
+	let m;
+
 	// Is webkit? http://stackoverflow.com/a/16459606/376773
 	// document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
+	// eslint-disable-next-line no-return-assign
 	return (typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance) ||
 		// Is firebug? http://stackoverflow.com/a/398120/376773
 		(typeof window !== 'undefined' && window.console && (window.console.firebug || (window.console.exception && window.console.table))) ||
 		// Is firefox >= v31?
 		// https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
-		(typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31) ||
+		(typeof navigator !== 'undefined' && navigator.userAgent && (m = navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/)) && parseInt(m[1], 10) >= 31) ||
 		// Double check webkit in userAgent just in case we are in a worker
 		(typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/));
 }
@@ -21708,24 +21711,62 @@ function setup(env) {
 		createDebug.names = [];
 		createDebug.skips = [];
 
-		let i;
-		const split = (typeof namespaces === 'string' ? namespaces : '').split(/[\s,]+/);
-		const len = split.length;
+		const split = (typeof namespaces === 'string' ? namespaces : '')
+			.trim()
+			.replace(' ', ',')
+			.split(',')
+			.filter(Boolean);
 
-		for (i = 0; i < len; i++) {
-			if (!split[i]) {
-				// ignore empty strings
-				continue;
-			}
-
-			namespaces = split[i].replace(/\*/g, '.*?');
-
-			if (namespaces[0] === '-') {
-				createDebug.skips.push(new RegExp('^' + namespaces.slice(1) + '$'));
+		for (const ns of split) {
+			if (ns[0] === '-') {
+				createDebug.skips.push(ns.slice(1));
 			} else {
-				createDebug.names.push(new RegExp('^' + namespaces + '$'));
+				createDebug.names.push(ns);
 			}
 		}
+	}
+
+	/**
+	 * Checks if the given string matches a namespace template, honoring
+	 * asterisks as wildcards.
+	 *
+	 * @param {String} search
+	 * @param {String} template
+	 * @return {Boolean}
+	 */
+	function matchesTemplate(search, template) {
+		let searchIndex = 0;
+		let templateIndex = 0;
+		let starIndex = -1;
+		let matchIndex = 0;
+
+		while (searchIndex < search.length) {
+			if (templateIndex < template.length && (template[templateIndex] === search[searchIndex] || template[templateIndex] === '*')) {
+				// Match character or proceed with wildcard
+				if (template[templateIndex] === '*') {
+					starIndex = templateIndex;
+					matchIndex = searchIndex;
+					templateIndex++; // Skip the '*'
+				} else {
+					searchIndex++;
+					templateIndex++;
+				}
+			} else if (starIndex !== -1) { // eslint-disable-line no-negated-condition
+				// Backtrack to the last '*' and try to match more characters
+				templateIndex = starIndex + 1;
+				matchIndex++;
+				searchIndex = matchIndex;
+			} else {
+				return false; // No match
+			}
+		}
+
+		// Handle trailing '*' in template
+		while (templateIndex < template.length && template[templateIndex] === '*') {
+			templateIndex++;
+		}
+
+		return templateIndex === template.length;
 	}
 
 	/**
@@ -21736,8 +21777,8 @@ function setup(env) {
 	*/
 	function disable() {
 		const namespaces = [
-			...createDebug.names.map(toNamespace),
-			...createDebug.skips.map(toNamespace).map(namespace => '-' + namespace)
+			...createDebug.names,
+			...createDebug.skips.map(namespace => '-' + namespace)
 		].join(',');
 		createDebug.enable('');
 		return namespaces;
@@ -21751,39 +21792,19 @@ function setup(env) {
 	* @api public
 	*/
 	function enabled(name) {
-		if (name[name.length - 1] === '*') {
-			return true;
-		}
-
-		let i;
-		let len;
-
-		for (i = 0, len = createDebug.skips.length; i < len; i++) {
-			if (createDebug.skips[i].test(name)) {
+		for (const skip of createDebug.skips) {
+			if (matchesTemplate(name, skip)) {
 				return false;
 			}
 		}
 
-		for (i = 0, len = createDebug.names.length; i < len; i++) {
-			if (createDebug.names[i].test(name)) {
+		for (const ns of createDebug.names) {
+			if (matchesTemplate(name, ns)) {
 				return true;
 			}
 		}
 
 		return false;
-	}
-
-	/**
-	* Convert regexp to namespace
-	*
-	* @param {RegExp} regxep
-	* @return {String} namespace
-	* @api private
-	*/
-	function toNamespace(regexp) {
-		return regexp.toString()
-			.substring(2, regexp.toString().length - 2)
-			.replace(/\.\*\?$/, '*');
 	}
 
 	/**
@@ -22027,11 +22048,11 @@ function getDate() {
 }
 
 /**
- * Invokes `util.format()` with the specified arguments and writes to stderr.
+ * Invokes `util.formatWithOptions()` with the specified arguments and writes to stderr.
  */
 
 function log(...args) {
-	return process.stderr.write(util.format(...args) + '\n');
+	return process.stderr.write(util.formatWithOptions(exports.inspectOpts, ...args) + '\n');
 }
 
 /**
@@ -28678,7 +28699,7 @@ var y = d * 365.25;
  * @api public
  */
 
-module.exports = function(val, options) {
+module.exports = function (val, options) {
   options = options || {};
   var type = typeof val;
   if (type === 'string' && val.length > 0) {
@@ -61963,425 +61984,6 @@ function mdxjs(options) {
   ])
 }
 
-;// CONCATENATED MODULE: ./node_modules/unist-util-is/lib/index.js
-/**
- * @typedef {import('unist').Node} Node
- * @typedef {import('unist').Parent} Parent
- */
-
-/**
- * @typedef {Record<string, unknown>} Props
- * @typedef {null | undefined | string | Props | TestFunctionAnything | Array<string | Props | TestFunctionAnything>} Test
- *   Check for an arbitrary node, unaware of TypeScript inferral.
- *
- * @callback TestFunctionAnything
- *   Check if a node passes a test, unaware of TypeScript inferral.
- * @param {unknown} this
- *   The given context.
- * @param {Node} node
- *   A node.
- * @param {number | null | undefined} [index]
- *   The node’s position in its parent.
- * @param {Parent | null | undefined} [parent]
- *   The node’s parent.
- * @returns {boolean | void}
- *   Whether this node passes the test.
- */
-
-/**
- * @template {Node} Kind
- *   Node type.
- * @typedef {Kind['type'] | Partial<Kind> | TestFunctionPredicate<Kind> | Array<Kind['type'] | Partial<Kind> | TestFunctionPredicate<Kind>>} PredicateTest
- *   Check for a node that can be inferred by TypeScript.
- */
-
-/**
- * Check if a node passes a certain test.
- *
- * @template {Node} Kind
- *   Node type.
- * @callback TestFunctionPredicate
- *   Complex test function for a node that can be inferred by TypeScript.
- * @param {Node} node
- *   A node.
- * @param {number | null | undefined} [index]
- *   The node’s position in its parent.
- * @param {Parent | null | undefined} [parent]
- *   The node’s parent.
- * @returns {node is Kind}
- *   Whether this node passes the test.
- */
-
-/**
- * @callback AssertAnything
- *   Check that an arbitrary value is a node, unaware of TypeScript inferral.
- * @param {unknown} [node]
- *   Anything (typically a node).
- * @param {number | null | undefined} [index]
- *   The node’s position in its parent.
- * @param {Parent | null | undefined} [parent]
- *   The node’s parent.
- * @returns {boolean}
- *   Whether this is a node and passes a test.
- */
-
-/**
- * Check if a node is a node and passes a certain node test.
- *
- * @template {Node} Kind
- *   Node type.
- * @callback AssertPredicate
- *   Check that an arbitrary value is a specific node, aware of TypeScript.
- * @param {unknown} [node]
- *   Anything (typically a node).
- * @param {number | null | undefined} [index]
- *   The node’s position in its parent.
- * @param {Parent | null | undefined} [parent]
- *   The node’s parent.
- * @returns {node is Kind}
- *   Whether this is a node and passes a test.
- */
-
-/**
- * Check if `node` is a `Node` and whether it passes the given test.
- *
- * @param node
- *   Thing to check, typically `Node`.
- * @param test
- *   A check for a specific node.
- * @param index
- *   The node’s position in its parent.
- * @param parent
- *   The node’s parent.
- * @returns
- *   Whether `node` is a node and passes a test.
- */
-const is =
-  /**
-   * @type {(
-   *   (() => false) &
-   *   (<Kind extends Node = Node>(node: unknown, test: PredicateTest<Kind>, index: number, parent: Parent, context?: unknown) => node is Kind) &
-   *   (<Kind extends Node = Node>(node: unknown, test: PredicateTest<Kind>, index?: null | undefined, parent?: null | undefined, context?: unknown) => node is Kind) &
-   *   ((node: unknown, test: Test, index: number, parent: Parent, context?: unknown) => boolean) &
-   *   ((node: unknown, test?: Test, index?: null | undefined, parent?: null | undefined, context?: unknown) => boolean)
-   * )}
-   */
-  (
-    /**
-     * @param {unknown} [node]
-     * @param {Test} [test]
-     * @param {number | null | undefined} [index]
-     * @param {Parent | null | undefined} [parent]
-     * @param {unknown} [context]
-     * @returns {boolean}
-     */
-    // eslint-disable-next-line max-params
-    function is(node, test, index, parent, context) {
-      const check = convert(test)
-
-      if (
-        index !== undefined &&
-        index !== null &&
-        (typeof index !== 'number' ||
-          index < 0 ||
-          index === Number.POSITIVE_INFINITY)
-      ) {
-        throw new Error('Expected positive finite index')
-      }
-
-      if (
-        parent !== undefined &&
-        parent !== null &&
-        (!is(parent) || !parent.children)
-      ) {
-        throw new Error('Expected parent node')
-      }
-
-      if (
-        (parent === undefined || parent === null) !==
-        (index === undefined || index === null)
-      ) {
-        throw new Error('Expected both parent and index')
-      }
-
-      // @ts-expect-error Looks like a node.
-      return node && node.type && typeof node.type === 'string'
-        ? Boolean(check.call(context, node, index, parent))
-        : false
-    }
-  )
-
-/**
- * Generate an assertion from a test.
- *
- * Useful if you’re going to test many nodes, for example when creating a
- * utility where something else passes a compatible test.
- *
- * The created function is a bit faster because it expects valid input only:
- * a `node`, `index`, and `parent`.
- *
- * @param test
- *   *   when nullish, checks if `node` is a `Node`.
- *   *   when `string`, works like passing `(node) => node.type === test`.
- *   *   when `function` checks if function passed the node is true.
- *   *   when `object`, checks that all keys in test are in node, and that they have (strictly) equal values.
- *   *   when `array`, checks if any one of the subtests pass.
- * @returns
- *   An assertion.
- */
-const convert =
-  /**
-   * @type {(
-   *   (<Kind extends Node>(test: PredicateTest<Kind>) => AssertPredicate<Kind>) &
-   *   ((test?: Test) => AssertAnything)
-   * )}
-   */
-  (
-    /**
-     * @param {Test} [test]
-     * @returns {AssertAnything}
-     */
-    function (test) {
-      if (test === undefined || test === null) {
-        return ok
-      }
-
-      if (typeof test === 'string') {
-        return typeFactory(test)
-      }
-
-      if (typeof test === 'object') {
-        return Array.isArray(test) ? anyFactory(test) : propsFactory(test)
-      }
-
-      if (typeof test === 'function') {
-        return castFactory(test)
-      }
-
-      throw new Error('Expected function, string, or object as test')
-    }
-  )
-
-/**
- * @param {Array<string | Props | TestFunctionAnything>} tests
- * @returns {AssertAnything}
- */
-function anyFactory(tests) {
-  /** @type {Array<AssertAnything>} */
-  const checks = []
-  let index = -1
-
-  while (++index < tests.length) {
-    checks[index] = convert(tests[index])
-  }
-
-  return castFactory(any)
-
-  /**
-   * @this {unknown}
-   * @param {Array<unknown>} parameters
-   * @returns {boolean}
-   */
-  function any(...parameters) {
-    let index = -1
-
-    while (++index < checks.length) {
-      if (checks[index].call(this, ...parameters)) return true
-    }
-
-    return false
-  }
-}
-
-/**
- * Turn an object into a test for a node with a certain fields.
- *
- * @param {Props} check
- * @returns {AssertAnything}
- */
-function propsFactory(check) {
-  return castFactory(all)
-
-  /**
-   * @param {Node} node
-   * @returns {boolean}
-   */
-  function all(node) {
-    /** @type {string} */
-    let key
-
-    for (key in check) {
-      // @ts-expect-error: hush, it sure works as an index.
-      if (node[key] !== check[key]) return false
-    }
-
-    return true
-  }
-}
-
-/**
- * Turn a string into a test for a node with a certain type.
- *
- * @param {string} check
- * @returns {AssertAnything}
- */
-function typeFactory(check) {
-  return castFactory(type)
-
-  /**
-   * @param {Node} node
-   */
-  function type(node) {
-    return node && node.type === check
-  }
-}
-
-/**
- * Turn a custom test into a test for a node that passes that test.
- *
- * @param {TestFunctionAnything} check
- * @returns {AssertAnything}
- */
-function castFactory(check) {
-  return assertion
-
-  /**
-   * @this {unknown}
-   * @param {unknown} node
-   * @param {Array<unknown>} parameters
-   * @returns {boolean}
-   */
-  function assertion(node, ...parameters) {
-    return Boolean(
-      node &&
-        typeof node === 'object' &&
-        'type' in node &&
-        // @ts-expect-error: fine.
-        Boolean(check.call(this, node, ...parameters))
-    )
-  }
-}
-
-function ok() {
-  return true
-}
-
-;// CONCATENATED MODULE: ./node_modules/unist-util-filter/lib/index.js
-/**
- * @typedef {import('unist').Node} Node
- * @typedef {import('unist').Parent} Parent
- * @typedef {import('unist-util-is').Test} Test
- *
- * @typedef Options
- *   Configuration (optional).
- * @property {boolean | null | undefined} [cascade=true]
- *   Whether to drop parent nodes if they had children, but all their children
- *   were filtered out.
- */
-
-
-
-const unist_util_filter_lib_own = {}.hasOwnProperty
-
-/**
- * Create a new `tree` of copies of all nodes that pass `test`.
- *
- * The tree is walked in *preorder* (NLR), visiting the node itself, then its
- * head, etc.
- *
- * @param tree
- *   Tree to filter.
- * @param options
- *   Configuration (optional).
- * @param test
- *   `unist-util-is` compatible test.
- * @returns
- *   New filtered tree.
- *
- *   `null` is returned if `tree` itself didn’t pass the test, or is cascaded
- *   away.
- */
-const filter =
-  /**
-   * @type {(
-   *  (<Tree extends Node, Check extends Test>(node: Tree, options: Options | null | undefined, test: Check | null | undefined) => import('./complex-types.js').Matches<Tree, Check>) &
-   *  (<Tree extends Node, Check extends Test>(node: Tree, test: Check) => import('./complex-types.js').Matches<Tree, Check>) &
-   *  (<Tree extends Node>(node: Tree, options?: Options | null | undefined) => Tree)
-   * )}
-   */
-  (
-    /**
-     * @param {Node} tree
-     * @param {Options | Test | null | undefined} [options]
-     * @param {Test | null | undefined} [test]
-     * @returns {Node | null}
-     */
-    function (tree, options, test) {
-      const is = convert(test || options)
-      /** @type {boolean | null | undefined} */
-      const cascadeRaw =
-        options && typeof options === 'object' && 'cascade' in options
-          ? /** @type {boolean | null | undefined} */ (options.cascade)
-          : undefined
-      const cascade =
-        cascadeRaw === undefined || cascadeRaw === null ? true : cascadeRaw
-
-      return preorder(tree)
-
-      /**
-       * @param {Node} node
-       *   Current node.
-       * @param {number | undefined} [index]
-       *   Index of `node` in `parent`.
-       * @param {Parent | undefined} [parent]
-       *   Parent node.
-       * @returns {Node | null}
-       *   Shallow copy of `node`.
-       */
-      function preorder(node, index, parent) {
-        /** @type {Array<Node>} */
-        const children = []
-
-        if (!is(node, index, parent)) return null
-
-        // @ts-expect-error: Looks like a parent.
-        if (node.children) {
-          let childIndex = -1
-
-          // @ts-expect-error Looks like a parent.
-          while (++childIndex < node.children.length) {
-            // @ts-expect-error Looks like a parent.
-            const result = preorder(node.children[childIndex], childIndex, node)
-
-            if (result) {
-              children.push(result)
-            }
-          }
-
-          // @ts-expect-error Looks like a parent.
-          if (cascade && node.children.length > 0 && children.length === 0)
-            return null
-        }
-
-        // Create a shallow clone, using the new children.
-        /** @type {typeof node} */
-        // @ts-expect-error all the fields will be copied over.
-        const next = {}
-        /** @type {string} */
-        let key
-
-        for (key in node) {
-          if (unist_util_filter_lib_own.call(node, key)) {
-            // @ts-expect-error: Looks like a record.
-            next[key] = key === 'children' ? children : node[key]
-          }
-        }
-
-        return next
-      }
-    }
-  )
-
 ;// CONCATENATED MODULE: ./src/sources/base.ts
 class BaseSource {
     constructor(source, path, parentPath) {
@@ -62392,16 +61994,6 @@ class BaseSource {
 }
 
 ;// CONCATENATED MODULE: ./src/sources/markdown.ts
-var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-
 
 
 
@@ -62532,7 +62124,7 @@ function processMdxForSearch(content) {
     }
     const slugger = new BananaSlug();
     // We want to chunk this into 400 token chunks, w/ 100 token overlap
-    const contentTokens = encode(content);
+    const contentTokens = encode(rawContent);
     const chunks = [];
     const chunkSize = 400;
     const overlap = 100;
@@ -62542,24 +62134,24 @@ function processMdxForSearch(content) {
     // Now we need to decode these chunks
     const decodedChunks = chunks.map(decode);
     const sections = decodedChunks.map((chunkText, i, chunkArray) => {
-        const content = chunkText.trim();
-        const localTree = fromMarkdown(content, {
+        const text = chunkText.trim();
+        const localTree = fromMarkdown(text, {
             extensions: [mdxjs()],
             mdastExtensions: [mdxFromMarkdown()]
         });
-        const headings = filter(localTree, node => node.type === 'heading');
-        const [first] = headings.children;
-        const heading = (first === null || first === void 0 ? void 0 : first.type) === 'heading' ? lib_toString(first) : undefined;
+        const headings = localTree.children.filter(node => node.type === 'heading');
+        const heading = (headings === null || headings === void 0 ? void 0 : headings[0]) ? lib_toString(headings[0]) : undefined;
         const slug = slugger.slug(heading);
         if (heading && slug) {
             return {
-                content,
+                content: text,
                 heading,
-                slug
+                slug,
+                localTree
             };
         }
         return {
-            content
+            content: text
         };
     });
     // const sectionTrees = splitTreeBy(mdTree, node => node.type === 'heading')
@@ -62594,293 +62186,267 @@ class MarkdownSource extends BaseSource {
         this.parentFilePath = parentFilePath;
         this.type = 'markdown';
     }
-    load() {
-        return __awaiter(this, void 0, void 0, function* () {
-            const contents = yield (0,promises_namespaceObject.readFile)(this.filePath, 'utf8');
-            const { checksum, meta, sections } = processMdxForSearch(contents);
-            this.checksum = checksum;
-            this.meta = meta;
-            this.sections = sections;
-            return {
-                checksum,
-                meta,
-                sections
-            };
-        });
+    async load() {
+        const contents = await (0,promises_namespaceObject.readFile)(this.filePath, 'utf8');
+        const { checksum, meta, sections } = processMdxForSearch(contents);
+        this.checksum = checksum;
+        this.meta = meta;
+        this.sections = sections;
+        return {
+            checksum,
+            meta,
+            sections
+        };
     }
 }
 
 // EXTERNAL MODULE: external "path"
 var external_path_ = __nccwpck_require__(1017);
 ;// CONCATENATED MODULE: ./src/sources/util.ts
-var util_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 
 
-function walk(dir, parentPath) {
-    return util_awaiter(this, void 0, void 0, function* () {
-        const immediateFiles = yield (0,promises_namespaceObject.readdir)(dir);
-        const recursiveFiles = yield Promise.all(immediateFiles.map((file) => util_awaiter(this, void 0, void 0, function* () {
-            const path = (0,external_path_.join)(dir, file);
-            const stats = yield (0,promises_namespaceObject.stat)(path);
-            if (stats.isDirectory()) {
-                // Keep track of document hierarchy (if this dir has corresponding doc file)
-                const docPath = `${(0,external_path_.basename)(path)}.mdx`;
-                return walk(path, immediateFiles.includes(docPath)
-                    ? (0,external_path_.join)((0,external_path_.dirname)(path), docPath)
-                    : parentPath);
-            }
-            else if (stats.isFile()) {
-                return [
-                    {
-                        path: path,
-                        parentPath
-                    }
-                ];
-            }
-            else {
-                return [];
-            }
-        })));
-        const flattenedFiles = recursiveFiles.reduce((all, folderContents) => all.concat(folderContents), []);
-        return flattenedFiles.sort((a, b) => a.path.localeCompare(b.path));
-    });
+async function walk(dir, parentPath) {
+    const immediateFiles = await (0,promises_namespaceObject.readdir)(dir);
+    const recursiveFiles = await Promise.all(immediateFiles.map(async (file) => {
+        const path = (0,external_path_.join)(dir, file);
+        const stats = await (0,promises_namespaceObject.stat)(path);
+        if (stats.isDirectory()) {
+            // Keep track of document hierarchy (if this dir has corresponding doc file)
+            const docPath = `${(0,external_path_.basename)(path)}.mdx`;
+            return walk(path, immediateFiles.includes(docPath)
+                ? (0,external_path_.join)((0,external_path_.dirname)(path), docPath)
+                : parentPath);
+        }
+        else if (stats.isFile()) {
+            return [
+                {
+                    path: path,
+                    parentPath
+                }
+            ];
+        }
+        else {
+            return [];
+        }
+    }));
+    const flattenedFiles = recursiveFiles.reduce((all, folderContents) => all.concat(folderContents), []);
+    return flattenedFiles.sort((a, b) => a.path.localeCompare(b.path));
 }
 
 ;// CONCATENATED MODULE: ./src/main.ts
-var main_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
+
+
+
+
+
+
+
+
+async function generateEmbeddings({ shouldRefresh = false, supabaseUrl, supabaseServiceKey, openaiKey, docsRootPath }) {
+    const supabaseClient = (0,main.createClient)(supabaseUrl, supabaseServiceKey, {
+        db: { schema: 'docs' },
+        auth: {
+            persistSession: false,
+            autoRefreshToken: false
+        }
     });
-};
-
-
-
-
-
-
-
-
-function generateEmbeddings({ shouldRefresh = false, supabaseUrl, supabaseServiceKey, openaiKey, docsRootPath }) {
-    return main_awaiter(this, void 0, void 0, function* () {
-        const supabaseClient = (0,main.createClient)(supabaseUrl, supabaseServiceKey, {
-            db: { schema: 'docs' },
-            auth: {
-                persistSession: false,
-                autoRefreshToken: false
+    // Use this version to track which pages to purge
+    // after the refresh
+    const refreshVersion = v4();
+    const refreshDate = new Date();
+    const ignoredFiles = ['pages/404.mdx'];
+    const embeddingSources = (await walk(docsRootPath))
+        .filter(({ path }) => /\.mdx?$/.test(path))
+        .filter(({ path }) => !ignoredFiles.includes(path))
+        .map(entry => new MarkdownSource('markdown', entry.path));
+    console.log(`Discovered ${embeddingSources.length} pages`);
+    if (!shouldRefresh) {
+        console.log('Checking which pages are new or have changed');
+    }
+    else {
+        console.log('Refresh flag set, re-generating all pages');
+    }
+    for (const embeddingSource of embeddingSources) {
+        const { type, source, path, parentPath } = embeddingSource;
+        try {
+            const { checksum, meta, sections } = await embeddingSource.load();
+            // Check for existing page in DB and compare checksums
+            const { error: fetchPageError, data: existingPage } = await supabaseClient
+                .from('page')
+                .select('id, path, checksum, parentPage:parent_page_id(id, path)')
+                .filter('path', 'eq', path)
+                .limit(1)
+                .maybeSingle();
+            if (fetchPageError) {
+                throw fetchPageError;
             }
-        });
-        // Use this version to track which pages to purge
-        // after the refresh
-        const refreshVersion = v4();
-        const refreshDate = new Date();
-        const ignoredFiles = ['pages/404.mdx'];
-        const embeddingSources = (yield walk(docsRootPath))
-            .filter(({ path }) => /\.mdx?$/.test(path))
-            .filter(({ path }) => !ignoredFiles.includes(path))
-            .map(entry => new MarkdownSource('markdown', entry.path));
-        console.log(`Discovered ${embeddingSources.length} pages`);
-        if (!shouldRefresh) {
-            console.log('Checking which pages are new or have changed');
-        }
-        else {
-            console.log('Refresh flag set, re-generating all pages');
-        }
-        for (const embeddingSource of embeddingSources) {
-            const { type, source, path, parentPath } = embeddingSource;
-            try {
-                const { checksum, meta, sections } = yield embeddingSource.load();
-                // Check for existing page in DB and compare checksums
-                const { error: fetchPageError, data: existingPage } = yield supabaseClient
-                    .from('page')
-                    .select('id, path, checksum, parentPage:parent_page_id(id, path)')
-                    .filter('path', 'eq', path)
-                    .limit(1)
-                    .maybeSingle();
-                if (fetchPageError) {
-                    throw fetchPageError;
-                }
-                // We use checksum to determine if this page & its sections need to be regenerated
-                if (!shouldRefresh && (existingPage === null || existingPage === void 0 ? void 0 : existingPage.checksum) === checksum) {
-                    const existingParentPage = existingPage.parentPage;
-                    // If parent page changed, update it
-                    //@ts-expect-error TS2531: Object is possibly 'null'.
-                    if (existingParentPage && (existingParentPage === null || existingParentPage === void 0 ? void 0 : existingParentPage.path) !== parentPath) {
-                        console.log(`[${path}] Parent page has changed. Updating to '${parentPath}'...`);
-                        const { error: fetchParentPageError, data: parentPage } = yield supabaseClient
-                            .from('page')
-                            .select()
-                            .filter('path', 'eq', parentPath)
-                            .limit(1)
-                            .maybeSingle();
-                        if (fetchParentPageError) {
-                            throw fetchParentPageError;
-                        }
-                        const { error: updatePageError } = yield supabaseClient
-                            .from('page')
-                            .update({ parent_page_id: parentPage === null || parentPage === void 0 ? void 0 : parentPage.id })
-                            .filter('id', 'eq', existingPage.id);
-                        if (updatePageError) {
-                            throw updatePageError;
-                        }
-                    }
-                    // No content/embedding update required on this page
-                    // Update other meta info
-                    const { error: updatePageError } = yield supabaseClient
+            // We use checksum to determine if this page & its sections need to be regenerated
+            if (!shouldRefresh && (existingPage === null || existingPage === void 0 ? void 0 : existingPage.checksum) === checksum) {
+                const existingParentPage = existingPage.parentPage;
+                // If parent page changed, update it
+                //@ts-expect-error TS2531: Object is possibly 'null'.
+                if (existingParentPage && (existingParentPage === null || existingParentPage === void 0 ? void 0 : existingParentPage.path) !== parentPath) {
+                    console.log(`[${path}] Parent page has changed. Updating to '${parentPath}'...`);
+                    const { error: fetchParentPageError, data: parentPage } = await supabaseClient
                         .from('page')
-                        .update({
-                        type,
-                        source,
-                        meta,
-                        version: refreshVersion,
-                        last_refresh: refreshDate
-                    })
+                        .select()
+                        .filter('path', 'eq', parentPath)
+                        .limit(1)
+                        .maybeSingle();
+                    if (fetchParentPageError) {
+                        throw fetchParentPageError;
+                    }
+                    const { error: updatePageError } = await supabaseClient
+                        .from('page')
+                        .update({ parent_page_id: parentPage === null || parentPage === void 0 ? void 0 : parentPage.id })
                         .filter('id', 'eq', existingPage.id);
                     if (updatePageError) {
                         throw updatePageError;
                     }
-                    continue;
                 }
-                if (existingPage) {
-                    if (!shouldRefresh) {
-                        console.log(`[${path}] Docs have changed, removing old page sections and their embeddings`);
-                    }
-                    else {
-                        console.log(`[${path}] Refresh flag set, removing old page sections and their embeddings`);
-                    }
-                    const { error: deletePageSectionError } = yield supabaseClient
-                        .from('page_section')
-                        .delete()
-                        .filter('page_id', 'eq', existingPage.id);
-                    if (deletePageSectionError) {
-                        throw deletePageSectionError;
-                    }
-                }
-                const { error: fetchParentPageError, data: parentPage } = yield supabaseClient
+                // No content/embedding update required on this page
+                // Update other meta info
+                const { error: updatePageError } = await supabaseClient
                     .from('page')
-                    .select()
-                    .filter('path', 'eq', parentPath)
-                    .limit(1)
-                    .maybeSingle();
-                if (fetchParentPageError) {
-                    throw fetchParentPageError;
-                }
-                // Create/update page record. Intentionally clear checksum until we
-                // have successfully generated all page sections.
-                const { error: upsertPageError, data: page } = yield supabaseClient
-                    .from('page')
-                    .upsert({
-                    checksum: null,
-                    path,
+                    .update({
                     type,
                     source,
                     meta,
-                    parent_page_id: parentPage === null || parentPage === void 0 ? void 0 : parentPage.id,
                     version: refreshVersion,
                     last_refresh: refreshDate
-                }, { onConflict: 'path' })
-                    .select()
-                    .limit(1)
-                    .single();
-                if (upsertPageError) {
-                    throw upsertPageError;
-                }
-                console.log(`[${path}] Adding ${sections.length} page sections (with embeddings)`);
-                for (const { slug, heading, content } of sections) {
-                    // OpenAI recommends replacing newlines with spaces for best results (specific to embeddings)
-                    const input = content.replace(/\n/g, ' ');
-                    try {
-                        const configuration = new dist.Configuration({
-                            apiKey: openaiKey
-                        });
-                        const openai = new dist.OpenAIApi(configuration);
-                        const embeddingResponse = yield openai.createEmbedding({
-                            model: 'text-embedding-ada-002',
-                            input
-                        });
-                        if (embeddingResponse.status !== 200) {
-                            throw new Error((0,external_util_.inspect)(embeddingResponse.data, false, 2));
-                        }
-                        const [responseData] = embeddingResponse.data.data;
-                        const { error: insertPageSectionError, data: pageSection } = yield supabaseClient
-                            .from('page_section')
-                            .insert({
-                            page_id: page.id,
-                            slug,
-                            heading,
-                            content,
-                            token_count: embeddingResponse.data.usage.total_tokens,
-                            embedding: responseData.embedding
-                        })
-                            .select()
-                            .limit(1)
-                            .single();
-                        if (insertPageSectionError) {
-                            throw insertPageSectionError;
-                        }
-                    }
-                    catch (err) {
-                        // TODO: decide how to better handle failed embeddings
-                        console.error(`Failed to generate embeddings for '${path}' page section starting with '${input.slice(0, 40)}...'`);
-                        throw err;
-                    }
-                }
-                // Set page checksum so that we know this page was stored successfully
-                const { error: updatePageError } = yield supabaseClient
-                    .from('page')
-                    .update({ checksum })
-                    .filter('id', 'eq', page.id);
+                })
+                    .filter('id', 'eq', existingPage.id);
                 if (updatePageError) {
                     throw updatePageError;
                 }
+                continue;
             }
-            catch (err) {
-                console.error(`Page '${path}' or one/multiple of its page sections failed to store properly. Page has been marked with null checksum to indicate that it needs to be re-generated.`);
-                console.error(err);
+            if (existingPage) {
+                if (!shouldRefresh) {
+                    console.log(`[${path}] Docs have changed, removing old page sections and their embeddings`);
+                }
+                else {
+                    console.log(`[${path}] Refresh flag set, removing old page sections and their embeddings`);
+                }
+                const { error: deletePageSectionError } = await supabaseClient
+                    .from('page_section')
+                    .delete()
+                    .filter('page_id', 'eq', existingPage.id);
+                if (deletePageSectionError) {
+                    throw deletePageSectionError;
+                }
+            }
+            const { error: fetchParentPageError, data: parentPage } = await supabaseClient
+                .from('page')
+                .select()
+                .filter('path', 'eq', parentPath)
+                .limit(1)
+                .maybeSingle();
+            if (fetchParentPageError) {
+                throw fetchParentPageError;
+            }
+            // Create/update page record. Intentionally clear checksum until we
+            // have successfully generated all page sections.
+            const { error: upsertPageError, data: page } = await supabaseClient
+                .from('page')
+                .upsert({
+                checksum: null,
+                path,
+                type,
+                source,
+                meta,
+                parent_page_id: parentPage === null || parentPage === void 0 ? void 0 : parentPage.id,
+                version: refreshVersion,
+                last_refresh: refreshDate
+            }, { onConflict: 'path' })
+                .select()
+                .limit(1)
+                .single();
+            if (upsertPageError) {
+                throw upsertPageError;
+            }
+            console.log(`[${path}] Adding ${sections.length} page sections (with embeddings)`);
+            for (const { slug, heading, content } of sections) {
+                // OpenAI recommends replacing newlines with spaces for best results (specific to embeddings)
+                const input = content.replace(/\n/g, ' ');
+                try {
+                    const configuration = new dist.Configuration({
+                        apiKey: openaiKey
+                    });
+                    const openai = new dist.OpenAIApi(configuration);
+                    const embeddingResponse = await openai.createEmbedding({
+                        model: 'text-embedding-ada-002',
+                        input
+                    });
+                    if (embeddingResponse.status !== 200) {
+                        throw new Error((0,external_util_.inspect)(embeddingResponse.data, false, 2));
+                    }
+                    const [responseData] = embeddingResponse.data.data;
+                    const { error: insertPageSectionError, data: pageSection } = await supabaseClient
+                        .from('page_section')
+                        .insert({
+                        page_id: page.id,
+                        slug,
+                        heading,
+                        content,
+                        token_count: embeddingResponse.data.usage.total_tokens,
+                        embedding: responseData.embedding
+                    })
+                        .select()
+                        .limit(1)
+                        .single();
+                    if (insertPageSectionError) {
+                        throw insertPageSectionError;
+                    }
+                }
+                catch (err) {
+                    // TODO: decide how to better handle failed embeddings
+                    console.error(`Failed to generate embeddings for '${path}' page section starting with '${input.slice(0, 40)}...'`);
+                    throw err;
+                }
+            }
+            // Set page checksum so that we know this page was stored successfully
+            const { error: updatePageError } = await supabaseClient
+                .from('page')
+                .update({ checksum })
+                .filter('id', 'eq', page.id);
+            if (updatePageError) {
+                throw updatePageError;
             }
         }
-        console.log(`Removing old pages and their sections`);
-        // Delete pages that have been removed (and their sections via cascade)
-        const { error: deletePageError } = yield supabaseClient
-            .from('page')
-            .delete()
-            .filter('version', 'neq', refreshVersion);
-        if (deletePageError) {
-            throw deletePageError;
+        catch (err) {
+            console.error(`Page '${path}' or one/multiple of its page sections failed to store properly. Page has been marked with null checksum to indicate that it needs to be re-generated.`);
+            console.error(err);
         }
-        console.log('Embedding generation complete');
-    });
+    }
+    console.log(`Removing old pages and their sections`);
+    // Delete pages that have been removed (and their sections via cascade)
+    const { error: deletePageError } = await supabaseClient
+        .from('page')
+        .delete()
+        .filter('version', 'neq', refreshVersion);
+    if (deletePageError) {
+        throw deletePageError;
+    }
+    console.log('Embedding generation complete');
 }
-function run() {
-    return main_awaiter(this, void 0, void 0, function* () {
-        try {
-            const supabaseUrl = core.getInput('supabase-url');
-            const supabaseServiceKey = core.getInput('supabase-service-role-key');
-            const openaiKey = core.getInput('openai-key');
-            const docsRootPath = core.getInput('docs-root-path');
-            yield generateEmbeddings({
-                supabaseUrl,
-                supabaseServiceKey,
-                openaiKey,
-                docsRootPath
-            });
-        }
-        catch (error) {
-            if (error instanceof Error)
-                core.setFailed(error.message);
-        }
-    });
+async function run() {
+    try {
+        const supabaseUrl = core.getInput('supabase-url');
+        const supabaseServiceKey = core.getInput('supabase-service-role-key');
+        const openaiKey = core.getInput('openai-key');
+        const docsRootPath = core.getInput('docs-root-path');
+        await generateEmbeddings({
+            supabaseUrl,
+            supabaseServiceKey,
+            openaiKey,
+            docsRootPath
+        });
+    }
+    catch (error) {
+        if (error instanceof Error)
+            core.setFailed(error.message);
+    }
 }
 run();
 

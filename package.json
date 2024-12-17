@@ -9,7 +9,7 @@
     "format-check": "prettier --check '**/*.ts'",
     "lint": "eslint src/**/*.ts",
     "package": "ncc build --source-map --license licenses.txt",
-    "test": "jest",
+    "test": "vitest",
     "all": "npm run format && npm run package"
   },
   "repository": {
@@ -53,6 +53,7 @@
     "js-yaml": "^4.1.0",
     "prettier": "^2.8.8",
     "ts-jest": "^29.1.1",
-    "typescript": "^5.2.2"
+    "typescript": "^5.2.2",
+    "vitest": "^2.1.8"
   }
 }

@@ -175,7 +175,7 @@ export function processMdxForSearch(content: string): ProcessedMdx {
   const slugger = new GithubSlugger()
 
   // We want to chunk this into 400 token chunks, w/ 100 token overlap
-  const contentTokens = encode(content)
+  const contentTokens = encode(rawContent)
   const chunks = []
   const chunkSize = 400
   const overlap = 100
@@ -188,27 +188,29 @@ export function processMdxForSearch(content: string): ProcessedMdx {
   const decodedChunks = chunks.map(decode)
 
   const sections = decodedChunks.map((chunkText, i, chunkArray) => {
-    const content = chunkText.trim()
+    const text = chunkText.trim()
 
-    const localTree = fromMarkdown(content, {
+    const localTree = fromMarkdown(text, {
       extensions: [mdxjs()],
       mdastExtensions: [mdxFromMarkdown()]
     })
-    const headings = filter(localTree, node => node.type === 'heading')
-    const [first] = headings.children
-    const heading = first?.type === 'heading' ? toString(first) : undefined
+
+    const headings = localTree.children.filter(node => node.type === 'heading')
+
+    const heading = headings?.[0] ? toString(headings[0]) : undefined
     const slug = slugger.slug(heading)
 
     if (heading && slug) {
       return {
-        content,
+        content: text,
         heading,
-        slug
+        slug,
+        localTree
       }
     }
 
     return {
-      content
+      content: text
     }
   })
 
