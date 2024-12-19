@@ -194,7 +194,7 @@ async function generateEmbeddings({
           const openai = new OpenAIApi(configuration)
 
           const embeddingResponse = await openai.createEmbedding({
-            model: 'text-embedding-ada-002',
+            model: 'text-embedding-3-large',
             input
           })
 
