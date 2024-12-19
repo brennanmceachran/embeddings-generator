@@ -2,9 +2,14 @@
 
 This action updates Supabase's default `headless-vector-search` example with a few changes:
 
-- Broader chunking strategy changes for content (400 token, 100 token overlap)
-- Updates to `text-embedding-3-large` embeddings model (from ada-002)
 - Adds tests with `vitest` (removes jest)
+- Broader chunking strategy changes for content (400 token, 100 token overlap)
+- Updates to `text-embedding-3-large` embeddings model (from ada-002). You'll need to update the schema
+
+```sql
+ALTER TABLE docs.page_section
+ALTER COLUMN embedding TYPE vector(3072);
+```
 
 ## Usage
 
