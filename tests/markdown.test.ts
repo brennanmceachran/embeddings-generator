@@ -6,21 +6,21 @@ describe('processMdxForSearch', () => {
     const result = processMdxForSearch(content)
     const section = result.sections[0]
 
-    expect(section.meta.currentHeadingStack).toEqual({})
-    expect(section.meta.chunkStart).toBe(0)
-    expect(section.meta.chunkEnd).toBe(34)
+    expect(section.meta.chunk.currentHeadingStack).toEqual({})
+    expect(section.meta.chunk.lineStart).toBe(0)
+    expect(section.meta.chunk.lineEnd).toBe(34)
   })
 
   test('should filter out nulls in currentHeadingStack', () => {
     const result = processMdxForSearch(content)
     const lastSection = result.sections[result.sections.length - 1]
 
-    expect(lastSection.meta.currentHeadingStack).toEqual({
+    expect(lastSection.meta.chunk.currentHeadingStack).toEqual({
       h1: {heading: 'Heading 8'},
       h2: {heading: 'Heading 9'},
       h3: {heading: 'Heading 10'}
     })
-    expect(lastSection.meta.currentHeadingStack.h6).toBeUndefined()
+    expect(lastSection.meta.chunk.currentHeadingStack.h6).toBeUndefined()
   })
 
   test('should handle multiple chunks correctly', () => {
@@ -28,8 +28,10 @@ describe('processMdxForSearch', () => {
     expect(result.sections.length).toBeGreaterThan(0)
 
     const section = result.sections[1]
-    expect(section.meta.chunkStart).toBeGreaterThan(0)
-    expect(section.meta.chunkEnd).toBeGreaterThan(section.meta.chunkStart)
+    expect(section.meta.chunk.lineStart).toBeGreaterThan(0)
+    expect(section.meta.chunk.lineEnd).toBeGreaterThan(
+      section.meta.chunk.lineStart
+    )
   })
 
   test('should handle empty content', () => {

@@ -75,7 +75,7 @@ export function processMdxForSearch(content: string): ProcessedMdx {
 
   let chunkStart = 0
   let chunkEnd = 0
-  const priorHeadingStack: Section['meta']['currentHeadingStack'] = {
+  const priorHeadingStack: Section['meta']['chunk']['currentHeadingStack'] = {
     h1: null,
     h2: null,
     h3: null,
@@ -90,19 +90,21 @@ export function processMdxForSearch(content: string): ProcessedMdx {
 
     const localSerializableMeta: Section['meta'] = JSON.parse(
       JSON.stringify({
-        ...serializableMeta,
+        file: serializableMeta,
         // filter out nulls
-        currentHeadingStack: Object.keys(priorHeadingStack).reduce(
-          (acc, key) => {
-            if (priorHeadingStack[key]) {
-              acc[key] = priorHeadingStack[key]
-            }
-            return acc
-          },
-          {}
-        ),
-        chunkStart,
-        chunkEnd
+        chunk: {
+          currentHeadingStack: Object.keys(priorHeadingStack).reduce(
+            (acc, key) => {
+              if (priorHeadingStack[key]) {
+                acc[key] = priorHeadingStack[key]
+              }
+              return acc
+            },
+            {}
+          ),
+          lineStart: chunkStart,
+          lineEnd: chunkEnd
+        }
       })
     )
     const text = chunkText.replace(/^\s+|\s+$/g, '').trim() // Remove leading/trailing whitespace

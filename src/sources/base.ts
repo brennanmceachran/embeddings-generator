@@ -8,35 +8,38 @@ export type Section = {
   heading?: string
   slug?: string
   meta: {
-    chunkStart: number
-    chunkEnd: number
-    currentHeadingStack?: {
-      h1?: null | {
-        heading: string
-        customAnchor?: string
-      }
-      h2?: null | {
-        heading: string
-        customAnchor?: string
-      }
-      h3?: null | {
-        heading: string
-        customAnchor?: string
-      }
-      h4?: null | {
-        heading: string
-        customAnchor?: string
-      }
-      h5?: null | {
-        heading: string
-        customAnchor?: string
-      }
-      h6?: null | {
-        heading: string
-        customAnchor?: string
+    chunk: {
+      lineStart: number
+      lineEnd: number
+      currentHeadingStack?: {
+        h1?: null | {
+          heading: string
+          customAnchor?: string
+        }
+        h2?: null | {
+          heading: string
+          customAnchor?: string
+        }
+        h3?: null | {
+          heading: string
+          customAnchor?: string
+        }
+        h4?: null | {
+          heading: string
+          customAnchor?: string
+        }
+        h5?: null | {
+          heading: string
+          customAnchor?: string
+        }
+        h6?: null | {
+          heading: string
+          customAnchor?: string
+        }
       }
     }
-  } & Json
+    file: Json
+  }
 }
 
 export abstract class BaseSource {
