@@ -2,7 +2,6 @@ import {encode, decode} from 'gpt-tokenizer'
 import matter from 'gray-matter'
 import {createHash} from 'crypto'
 import {readFile} from 'fs/promises'
-import GithubSlugger from 'github-slugger'
 import {fromMarkdown} from 'mdast-util-from-markdown'
 import {mdxFromMarkdown} from 'mdast-util-mdx'
 import {toString} from 'mdast-util-to-string'
@@ -24,9 +23,15 @@ export function parseHeading(heading: string): {
   const match = heading.match(/(.*) *\[#(.*)\]/)
   if (match) {
     const [, heading, customAnchor] = match
-    return {heading, customAnchor}
+    const cleanedHeader = heading.replace(/\[#(.*)\]/, '').trim()
+    return {
+      heading: cleanedHeader,
+      customAnchor
+    }
   }
-  return {heading}
+  return {
+    heading: heading.trim()
+  }
 }
 
 /**
@@ -51,13 +56,11 @@ export function processMdxForSearch(content: string): ProcessedMdx {
     }
   }
 
-  const slugger = new GithubSlugger()
-
   // We want to chunk this into 400 token chunks, w/ 100 token overlap
   const contentTokens = encode(rawContent)
   const chunks = []
   const chunkSize = 400
-  const overlap = 100
+  const overlap = 0
 
   // Chunk the content
   // - We want to chunk the content into 400 token chunks
@@ -89,8 +92,14 @@ export function processMdxForSearch(content: string): ProcessedMdx {
       JSON.stringify({
         ...serializableMeta,
         // filter out nulls
-        currentHeadingStack: Object.fromEntries(
-          Object.entries(priorHeadingStack).filter(([, v]) => v)
+        currentHeadingStack: Object.keys(priorHeadingStack).reduce(
+          (acc, key) => {
+            if (priorHeadingStack[key]) {
+              acc[key] = priorHeadingStack[key]
+            }
+            return acc
+          },
+          {}
         ),
         chunkStart,
         chunkEnd
@@ -114,6 +123,7 @@ export function processMdxForSearch(content: string): ProcessedMdx {
       // Update the prior heading stack
       const {depth} = heading
       const key = `h${depth}` as keyof typeof priorHeadingStack
+      priorHeadingStack[key] = null
       priorHeadingStack[key] = parseHeading(toString(heading))
 
       // Reset all headings deeper than this one
@@ -123,12 +133,10 @@ export function processMdxForSearch(content: string): ProcessedMdx {
       }
     })
 
-    const slug = customAnchor ?? heading ? slugger.slug(heading) : null
-
     return {
       content: text,
-      heading: heading ? heading : undefined,
-      slug: slug ? slug : undefined,
+      heading: heading,
+      slug: customAnchor,
       meta: localSerializableMeta
     }
   })
