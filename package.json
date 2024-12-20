@@ -1,6 +1,6 @@
 {
   "name": "brennan-embeddings-generator",
-  "version": "0.1.2",
+  "version": "0.1.2-alpha",
   "private": true,
   "description": "A GitHub Action that converts your markdown files into embeddings and stores them in your Postgres/Supabase database, allowing you to perform vector similarity search inside your documentation and website.",
   "main": "src/main.ts",
@@ -10,7 +10,7 @@
     "lint": "eslint src/**/*.ts",
     "package": "ncc build --source-map --license licenses.txt",
     "test": "vitest",
-    "all": "vitest run && npm run format && npm run package"
+    "all": "vitest run && npm run lint && npm run format && npm run package"
   },
   "repository": {
     "type": "git",
