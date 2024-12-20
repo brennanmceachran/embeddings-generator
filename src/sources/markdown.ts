@@ -1,75 +1,13 @@
-import {
-  encode,
-  encodeChat,
-  decode,
-  isWithinTokenLimit,
-  encodeGenerator,
-  decodeGenerator,
-  decodeAsyncGenerator
-} from 'gpt-tokenizer'
+import {encode, decode} from 'gpt-tokenizer'
 import matter from 'gray-matter'
 import {createHash} from 'crypto'
-import {ObjectExpression} from 'estree'
 import {readFile} from 'fs/promises'
 import GithubSlugger from 'github-slugger'
-import {Content, Root} from 'mdast'
 import {fromMarkdown} from 'mdast-util-from-markdown'
-import {MdxjsEsm, mdxFromMarkdown} from 'mdast-util-mdx'
-import {toMarkdown} from 'mdast-util-to-markdown'
+import {mdxFromMarkdown} from 'mdast-util-mdx'
 import {toString} from 'mdast-util-to-string'
 import {mdxjs} from 'micromark-extension-mdxjs'
-import {u} from 'unist-builder'
-import {filter} from 'unist-util-filter'
 import {BaseSource, Json, Section} from './base'
-
-/**
- * Extracts ES literals from an `estree` `ObjectExpression`
- * into a plain JavaScript object.
- */
-export function getObjectFromExpression(node: ObjectExpression) {
-  return node.properties.reduce<
-    Record<string, string | number | bigint | true | RegExp | undefined>
-  >((object, property) => {
-    if (property.type !== 'Property') {
-      return object
-    }
-
-    const key =
-      (property.key.type === 'Identifier' && property.key.name) || undefined
-    const value =
-      (property.value.type === 'Literal' && property.value.value) || undefined
-
-    if (!key) {
-      return object
-    }
-
-    return {
-      ...object,
-      [key]: value
-    }
-  }, {})
-}
-
-/**
- * Splits a `mdast` tree into multiple trees based on
- * a predicate function. Will include the splitting node
- * at the beginning of each tree.
- *
- * Useful to split a markdown file into smaller sections.
- */
-export function splitTreeBy(tree: Root, predicate: (node: Content) => boolean) {
-  return tree.children.reduce<Root[]>((trees, node) => {
-    const [lastTree] = trees.slice(-1)
-
-    if (!lastTree || predicate(node)) {
-      const tree: Root = u('root', [node])
-      return trees.concat(tree)
-    }
-
-    lastTree.children.push(node)
-    return trees
-  }, [])
-}
 
 /**
  * Parses a markdown heading which can optionally
@@ -99,7 +37,7 @@ export function parseHeading(heading: string): {
 export function processMdxForSearch(content: string): ProcessedMdx {
   const checksum = createHash('sha256').update(content).digest('base64')
   const {content: rawContent, data: metadata} = matter(
-    content.replace(/^\s+|\s+$/g, '').trim()
+    content.replace(/^\s+|\s+$/g, '').trim() // Remove leading/trailing whitespace
   )
 
   const serializableMeta: Json =
@@ -121,6 +59,10 @@ export function processMdxForSearch(content: string): ProcessedMdx {
   const chunkSize = 400
   const overlap = 100
 
+  // Chunk the content
+  // - We want to chunk the content into 400 token chunks
+  // - We also want to overlap each chunk
+  // - This is because we want to ensure that we don't cut off any meaningful content
   for (let i = 0; i < contentTokens.length; i += chunkSize - overlap) {
     chunks.push(contentTokens.slice(i, i + chunkSize))
   }
@@ -128,8 +70,14 @@ export function processMdxForSearch(content: string): ProcessedMdx {
   // Now we need to decode these chunks
   const decodedChunks = chunks.map(decode)
 
-  const sections = decodedChunks.map((chunkText, i, chunkArray) => {
-    const text = chunkText.replace(/^\s+|\s+$/g, '').trim()
+  let lineNumStart = 0
+  let lineNumEnd = 0
+
+  const sections: Section[] = decodedChunks.map((chunkText, i, chunkArray) => {
+    lineNumStart = lineNumEnd
+    lineNumEnd += chunkText.split(/\r\n|\r|\n/).length // Count the number of lines in the chunk
+
+    const text = chunkText.replace(/^\s+|\s+$/g, '').trim() // Remove leading/trailing whitespace
 
     const localTree = fromMarkdown(text, {
       extensions: [mdxjs()],
@@ -138,20 +86,19 @@ export function processMdxForSearch(content: string): ProcessedMdx {
 
     const headings = localTree.children.filter(node => node.type === 'heading')
 
-    const heading = headings?.[0] ? toString(headings[0]) : undefined
-    const slug = slugger.slug(heading)
+    const {heading, customAnchor} = headings?.[0]
+      ? parseHeading(toString(headings[0]))
+      : {}
 
-    if (heading && slug) {
-      return {
-        content: text,
-        heading,
-        slug,
-        localTree
-      }
-    }
+    const slug = customAnchor ?? heading ? slugger.slug(heading) : null
 
     return {
-      content: text
+      content: text,
+      heading: heading ? heading : undefined,
+      slug: slug ? slug : undefined,
+      localTree,
+      lineNumEnd,
+      lineNumStart
     }
   })
 
