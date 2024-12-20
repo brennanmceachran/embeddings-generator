@@ -219,7 +219,7 @@ async function generateEmbeddings({
               slug,
               heading,
               content,
-              meta,
+              meta: chunkMeta,
               token_count: embeddingResponse.data.usage.total_tokens,
               embedding: responseData.embedding
             })
