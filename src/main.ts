@@ -66,7 +66,7 @@ async function generateEmbeddings({
         throw fetchPageError
       }
 
-      type Singular<T> = T extends any[] ? undefined : T
+      type Singular<T> = T extends unknown[] ? undefined : T
 
       // We use checksum to determine if this page & its sections need to be regenerated
       if (!shouldRefresh && existingPage?.checksum === checksum) {
@@ -183,9 +183,17 @@ async function generateEmbeddings({
       console.log(
         `[${path}] Adding ${sections.length} page sections (with embeddings)`
       )
-      for (const {slug, heading, content} of sections) {
+      for (const {slug, heading, content, meta: chunkMeta} of sections) {
         // OpenAI recommends replacing newlines with spaces for best results (specific to embeddings)
-        const input = content.replace(/\n/g, ' ')
+        const input = [
+          `<filechunk path="${path}{source == 'markdown' ? '.md' : ''}" filemeta="${encodeURIComponent(
+            JSON.stringify(meta)
+          )}" filechunkmeta="${encodeURIComponent(
+            JSON.stringify({chunkMeta})
+          )}">`,
+          content.replace(/\n/g, ' '),
+          '</filechunk>'
+        ].join('')
 
         try {
           const configuration = new Configuration({
@@ -204,20 +212,20 @@ async function generateEmbeddings({
 
           const [responseData] = embeddingResponse.data.data
 
-          const {error: insertPageSectionError, data: pageSection} =
-            await supabaseClient
-              .from('page_section')
-              .insert({
-                page_id: page.id,
-                slug,
-                heading,
-                content,
-                token_count: embeddingResponse.data.usage.total_tokens,
-                embedding: responseData.embedding
-              })
-              .select()
-              .limit(1)
-              .single()
+          const {error: insertPageSectionError} = await supabaseClient
+            .from('page_section')
+            .insert({
+              page_id: page.id,
+              slug,
+              heading,
+              content,
+              meta,
+              token_count: embeddingResponse.data.usage.total_tokens,
+              embedding: responseData.embedding
+            })
+            .select()
+            .limit(1)
+            .single()
 
           if (insertPageSectionError) {
             throw insertPageSectionError

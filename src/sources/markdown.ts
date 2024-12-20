@@ -70,15 +70,35 @@ export function processMdxForSearch(content: string): ProcessedMdx {
   // Now we need to decode these chunks
   const decodedChunks = chunks.map(decode)
 
-  let lineNumStart = 0
-  let lineNumEnd = 0
+  let chunkStart = 0
+  let chunkEnd = 0
+  const priorHeadingStack: Section['meta']['currentHeadingStack'] = {
+    h1: null,
+    h2: null,
+    h3: null,
+    h4: null,
+    h5: null,
+    h6: null
+  }
 
-  const sections: Section[] = decodedChunks.map((chunkText, i, chunkArray) => {
-    lineNumStart = lineNumEnd
-    lineNumEnd += chunkText.split(/\r\n|\r|\n/).length // Count the number of lines in the chunk
+  const sections: Section[] = decodedChunks.map(chunkText => {
+    chunkStart = chunkEnd
+    chunkEnd += chunkText.split(/\r\n|\r|\n/).length // Count the number of lines in the chunk
 
+    const localSerializableMeta: Section['meta'] = JSON.parse(
+      JSON.stringify({
+        ...serializableMeta,
+        // filter out nulls
+        currentHeadingStack: Object.fromEntries(
+          Object.entries(priorHeadingStack).filter(([, v]) => v)
+        ),
+        chunkStart,
+        chunkEnd
+      })
+    )
     const text = chunkText.replace(/^\s+|\s+$/g, '').trim() // Remove leading/trailing whitespace
 
+    // Parse the markdown content
     const localTree = fromMarkdown(text, {
       extensions: [mdxjs()],
       mdastExtensions: [mdxFromMarkdown()]
@@ -90,15 +110,26 @@ export function processMdxForSearch(content: string): ProcessedMdx {
       ? parseHeading(toString(headings[0]))
       : {}
 
+    headings.forEach(heading => {
+      // Update the prior heading stack
+      const {depth} = heading
+      const key = `h${depth}` as keyof typeof priorHeadingStack
+      priorHeadingStack[key] = parseHeading(toString(heading))
+
+      // Reset all headings deeper than this one
+      for (let i = depth + 1; i <= 6; i++) {
+        const key = `h${i}` as keyof typeof priorHeadingStack
+        priorHeadingStack[key] = null
+      }
+    })
+
     const slug = customAnchor ?? heading ? slugger.slug(heading) : null
 
     return {
       content: text,
       heading: heading ? heading : undefined,
       slug: slug ? slug : undefined,
-      localTree,
-      lineNumEnd,
-      lineNumStart
+      meta: localSerializableMeta
     }
   })
 

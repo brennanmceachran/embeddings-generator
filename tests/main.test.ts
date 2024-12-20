@@ -1,21 +1,7 @@
-import * as process from 'process'
-import * as cp from 'child_process'
-import * as path from 'path'
 import {expect, suite, test} from 'vitest'
 import {walk} from '../src/sources/util'
 import {MarkdownSource} from '../src/sources/markdown'
 import {encode} from 'gpt-tokenizer'
-
-// shows how the runner will run a javascript action with env / stdout protocol
-// test('test runs', () => {
-//   process.env['INPUT_MILLISECONDS'] = '500'
-//   const np = process.execPath
-//   const ip = path.join(__dirname, '..', 'dist', 'index.js')
-//   const options: cp.ExecFileSyncOptions = {
-//     env: process.env
-//   }
-//   console.log(cp.execFileSync(np, [ip], options).toString())
-// })
 
 const TESTROOT = './tests/test-files'
 
@@ -55,13 +41,13 @@ suite('it can parse and chunk markdown sources', async () => {
   )
 
   test('it can parse an empty mdx file', async () => {
-    emptyMDX.load().then(({checksum, meta, sections}) => {
+    emptyMDX.load().then(({meta, sections}) => {
       expect(Object.keys(meta).length).toBe(0)
       expect(sections.length).toBe(0)
     })
   })
   test('it can parse an empty md file', async () => {
-    longMD.load().then(({checksum, meta, sections}) => {
+    longMD.load().then(({meta, sections}) => {
       expect(Object.keys(meta).length).toBe(1)
       expect(meta.slug).toBe('second-file-md')
       expect(sections.length).toBe(1)
@@ -69,13 +55,13 @@ suite('it can parse and chunk markdown sources', async () => {
     })
   })
   test('it can parse an empty ', async () => {
-    emptyMD.load().then(({checksum, meta, sections}) => {
+    emptyMD.load().then(({meta, sections}) => {
       expect(Object.keys(meta).length).toBe(0)
       expect(sections.length).toBe(0)
     })
   })
   test('it can parse a long mdx file', async () => {
-    longMDX.load().then(({checksum, meta, sections}) => {
+    longMDX.load().then(({meta, sections}) => {
       expect(meta.title).toBe('long mdx file')
       expect(sections.length).toBe(2)
       const encoded = encode(sections[0].content)

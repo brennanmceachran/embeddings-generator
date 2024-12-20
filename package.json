@@ -1,6 +1,6 @@
 {
   "name": "brennan-embeddings-generator",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "A GitHub Action that converts your markdown files into embeddings and stores them in your Postgres/Supabase database, allowing you to perform vector similarity search inside your documentation and website.",
   "main": "src/main.ts",
@@ -41,19 +41,22 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.17.0",
     "@types/estree": "^1.0.1",
     "@types/node": "^20.8.2",
     "@types/uuid": "^9.0.4",
-    "@typescript-eslint/parser": "^5.62.0",
+    "@typescript-eslint/eslint-plugin": "^8.18.1",
+    "@typescript-eslint/parser": "^8.18.1",
     "@vercel/ncc": "^0.36.1",
-    "eslint": "^8.42.0",
+    "eslint": "^9.17.0",
     "eslint-plugin-github": "^4.10.1",
     "eslint-plugin-jest": "^27.2.2",
     "jest": "^29.6.4",
     "js-yaml": "^4.1.0",
     "prettier": "^2.8.8",
     "ts-jest": "^29.1.1",
-    "typescript": "^5.2.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1",
     "vitest": "^2.1.8"
   }
 }
