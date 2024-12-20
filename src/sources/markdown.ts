@@ -51,47 +51,6 @@ export function getObjectFromExpression(node: ObjectExpression) {
 }
 
 /**
- * Extracts the `meta` ESM export from the MDX file.
- *
- * This info is akin to frontmatter.
- */
-export function extractMetaExport(mdxTree: Root) {
-  const metaExportNode = mdxTree.children.find((node): node is MdxjsEsm => {
-    return (
-      node.type === 'mdxjsEsm' &&
-      node.data?.estree?.body[0]?.type === 'ExportNamedDeclaration' &&
-      node.data.estree.body[0].declaration?.type === 'VariableDeclaration' &&
-      node.data.estree.body[0].declaration.declarations[0]?.id.type ===
-        'Identifier' &&
-      node.data.estree.body[0].declaration.declarations[0].id.name === 'meta'
-    )
-  })
-
-  if (!metaExportNode) {
-    return undefined
-  }
-
-  const objectExpression =
-    (metaExportNode.data?.estree?.body[0]?.type === 'ExportNamedDeclaration' &&
-      metaExportNode.data.estree.body[0].declaration?.type ===
-        'VariableDeclaration' &&
-      metaExportNode.data.estree.body[0].declaration.declarations[0]?.id
-        .type === 'Identifier' &&
-      metaExportNode.data.estree.body[0].declaration.declarations[0].id.name ===
-        'meta' &&
-      metaExportNode.data.estree.body[0].declaration.declarations[0].init
-        ?.type === 'ObjectExpression' &&
-      metaExportNode.data.estree.body[0].declaration.declarations[0].init) ||
-    undefined
-
-  if (!objectExpression) {
-    return undefined
-  }
-
-  return getObjectFromExpression(objectExpression)
-}
-
-/**
  * Splits a `mdast` tree into multiple trees based on
  * a predicate function. Will include the splitting node
  * at the beginning of each tree.
