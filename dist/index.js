@@ -63117,15 +63117,20 @@ function processMdxForSearch(content) {
     const sections = decodedChunks.map(chunkText => {
         chunkStart = chunkEnd;
         chunkEnd += chunkText.split(/\r\n|\r|\n/).length; // Count the number of lines in the chunk
-        const localSerializableMeta = JSON.parse(JSON.stringify(Object.assign(Object.assign({}, serializableMeta), { 
+        const localSerializableMeta = JSON.parse(JSON.stringify({
+            file: serializableMeta,
             // filter out nulls
-            currentHeadingStack: Object.keys(priorHeadingStack).reduce((acc, key) => {
-                if (priorHeadingStack[key]) {
-                    acc[key] = priorHeadingStack[key];
-                }
-                return acc;
-            }, {}), chunkStart,
-            chunkEnd })));
+            chunk: {
+                currentHeadingStack: Object.keys(priorHeadingStack).reduce((acc, key) => {
+                    if (priorHeadingStack[key]) {
+                        acc[key] = priorHeadingStack[key];
+                    }
+                    return acc;
+                }, {}),
+                lineStart: chunkStart,
+                lineEnd: chunkEnd
+            }
+        }));
         const text = chunkText.replace(/^\s+|\s+$/g, '').trim(); // Remove leading/trailing whitespace
         // Parse the markdown content
         const localTree = fromMarkdown(text, {
@@ -63353,7 +63358,7 @@ async function generateEmbeddings({ shouldRefresh = false, supabaseUrl, supabase
             for (const { slug, heading, content, meta: chunkMeta } of sections) {
                 // OpenAI recommends replacing newlines with spaces for best results (specific to embeddings)
                 const input = [
-                    `<filechunk path="${path}{source == 'markdown' ? '.md' : ''}" filemeta="${encodeURIComponent(JSON.stringify(meta))}" filechunkmeta="${encodeURIComponent(JSON.stringify({ chunkMeta }))}">`,
+                    `<filechunk path="${path}{source == 'markdown' ? '.md' : ''}" metadata="${encodeURIComponent(JSON.stringify({ chunkMeta }))}">`,
                     content.replace(/\n/g, ' '),
                     '</filechunk>'
                 ].join('');
