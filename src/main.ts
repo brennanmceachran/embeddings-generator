@@ -187,7 +187,7 @@ async function generateEmbeddings({
         // OpenAI recommends replacing newlines with spaces for best results (specific to embeddings)
         const input = [
           `<filechunk path="${path}{source == 'markdown' ? '.md' : ''}" metadata="${encodeURIComponent(
-            JSON.stringify({chunkMeta})
+            JSON.stringify(chunkMeta)
           )}">`,
           content.replace(/\n/g, ' '),
           '</filechunk>'

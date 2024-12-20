@@ -42,13 +42,14 @@ suite('it can parse and chunk markdown sources', async () => {
 
   test('it can parse an empty mdx file', async () => {
     emptyMDX.load().then(({meta, sections}) => {
-      expect(Object.keys(meta).length).toBe(0)
+      expect(Object.keys(meta).length).toBe(1)
       expect(sections.length).toBe(0)
     })
   })
   test('it can parse an empty md file', async () => {
     longMD.load().then(({meta, sections}) => {
-      expect(Object.keys(meta).length).toBe(1)
+      console.log(meta)
+      expect(Object.keys(meta).length).toBe(2)
       expect(meta.slug).toBe('second-file-md')
       expect(sections.length).toBe(1)
       expect(sections[0].content.slice(-1)).toBe('`')
@@ -56,7 +57,7 @@ suite('it can parse and chunk markdown sources', async () => {
   })
   test('it can parse an empty ', async () => {
     emptyMD.load().then(({meta, sections}) => {
-      expect(Object.keys(meta).length).toBe(0)
+      expect(Object.keys(meta).length).toBe(1)
       expect(sections.length).toBe(0)
     })
   })

@@ -63078,11 +63078,12 @@ function parseHeading(heading) {
  * It extracts metadata, strips it of all JSX,
  * and splits it into sub-sections based on criteria.
  */
-function processMdxForSearch(content) {
+function processMdxForSearch(content, fileMeta = {}) {
     const checksum = (0,external_crypto_.createHash)('sha256').update(content).digest('base64');
     const { content: rawContent, data: metadata } = gray_matter_default()(content.replace(/^\s+|\s+$/g, '').trim() // Remove leading/trailing whitespace
     );
-    const serializableMeta = metadata && JSON.parse(JSON.stringify(metadata));
+    const serializableMeta = metadata &&
+        JSON.parse(JSON.stringify(Object.assign(Object.assign({}, fileMeta), metadata)));
     if (!rawContent || !rawContent.trim()) {
         return {
             checksum,
@@ -63177,7 +63178,10 @@ class MarkdownSource extends BaseSource {
     }
     async load() {
         const contents = await (0,promises_namespaceObject.readFile)(this.filePath, 'utf8');
-        const { checksum, meta, sections } = processMdxForSearch(contents);
+        const { checksum, meta, sections } = processMdxForSearch(contents, {
+            parent: this.parentPath,
+            path: this.path
+        });
         this.checksum = checksum;
         this.meta = meta;
         this.sections = sections;
@@ -63358,7 +63362,7 @@ async function generateEmbeddings({ shouldRefresh = false, supabaseUrl, supabase
             for (const { slug, heading, content, meta: chunkMeta } of sections) {
                 // OpenAI recommends replacing newlines with spaces for best results (specific to embeddings)
                 const input = [
-                    `<filechunk path="${path}{source == 'markdown' ? '.md' : ''}" metadata="${encodeURIComponent(JSON.stringify({ chunkMeta }))}">`,
+                    `<filechunk path="${path}{source == 'markdown' ? '.md' : ''}" metadata="${encodeURIComponent(JSON.stringify(chunkMeta))}">`,
                     content.replace(/\n/g, ' '),
                     '</filechunk>'
                 ].join('');

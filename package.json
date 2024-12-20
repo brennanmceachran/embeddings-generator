@@ -1,6 +1,6 @@
 {
   "name": "brennan-embeddings-generator",
-  "version": "0.1.2-alpha",
+  "version": "0.1.3",
   "private": true,
   "description": "A GitHub Action that converts your markdown files into embeddings and stores them in your Postgres/Supabase database, allowing you to perform vector similarity search inside your documentation and website.",
   "main": "src/main.ts",

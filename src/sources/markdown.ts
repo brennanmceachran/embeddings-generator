@@ -39,14 +39,23 @@ export function parseHeading(heading: string): {
  * It extracts metadata, strips it of all JSX,
  * and splits it into sub-sections based on criteria.
  */
-export function processMdxForSearch(content: string): ProcessedMdx {
+export function processMdxForSearch(
+  content: string,
+  fileMeta: object = {}
+): ProcessedMdx {
   const checksum = createHash('sha256').update(content).digest('base64')
   const {content: rawContent, data: metadata} = matter(
     content.replace(/^\s+|\s+$/g, '').trim() // Remove leading/trailing whitespace
   )
 
   const serializableMeta: Json =
-    metadata && JSON.parse(JSON.stringify(metadata))
+    metadata &&
+    JSON.parse(
+      JSON.stringify({
+        ...fileMeta,
+        ...metadata
+      })
+    )
 
   if (!rawContent || !rawContent.trim()) {
     return {
@@ -175,7 +184,10 @@ export class MarkdownSource extends BaseSource {
   async load() {
     const contents = await readFile(this.filePath, 'utf8')
 
-    const {checksum, meta, sections} = processMdxForSearch(contents)
+    const {checksum, meta, sections} = processMdxForSearch(contents, {
+      parent: this.parentPath,
+      path: this.path
+    })
 
     this.checksum = checksum
     this.meta = meta
